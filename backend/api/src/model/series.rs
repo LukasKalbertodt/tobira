@@ -3,14 +3,15 @@ use juniper::{graphql_object, FieldResult};
 use crate::{Context, id::Key, Id, model::event::Event, util::RowExt};
 
 
-pub(crate) struct Series {
+pub(crate) struct Series<'ctx> {
     key: Key,
     title: String,
     description: Option<String>,
+    dummy: &'ctx (),
 }
 
-#[graphql_object(Context = Context)]
-impl Series {
+#[graphql_object(Context = Context<'ctx>)]
+impl<'ctx> Series<'ctx> {
     fn id(&self) -> Id {
         Id::series(self.key)
     }
@@ -23,13 +24,13 @@ impl Series {
         self.description.as_deref()
     }
 
-    async fn events(&self, context: &Context) -> FieldResult<Vec<Event>> {
+    async fn events(&self, context: &Context<'ctx>) -> FieldResult<Vec<Event>> {
         Event::load_for_series(self.key, context).await
     }
 }
 
-impl Series {
-    pub(crate) async fn load_by_id(id: Id, context: &Context) -> FieldResult<Option<Self>> {
+impl<'ctx> Series<'ctx> {
+    pub(crate) async fn load_by_id(id: Id, context: &Context<'ctx>) -> FieldResult<Option<Self>> {
         if let Some(key) = id.key_for(Id::SERIES_KIND) {
             Self::load_by_key(key, context).await
         } else {
@@ -37,7 +38,7 @@ impl Series {
         }
     }
 
-    pub(crate) async fn load_by_key(key: Key, context: &Context) -> FieldResult<Option<Series>> {
+    pub(crate) async fn load_by_key(key: Key, context: &Context<'ctx>) -> FieldResult<Option<Self>> {
         let result = context.db.get()
             .await?
             .query_opt(
@@ -51,6 +52,7 @@ impl Series {
                 key: row.get_key(0),
                 title: row.get(1),
                 description: row.get(2),
+                dummy: &(),
             });
 
         Ok(result)

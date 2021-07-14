@@ -11,8 +11,8 @@ use crate::{Context, Id, id::Key, model::series::Series, util::RowExt};
 
 
 /// A `Block`: a UI element that belongs to a realm.
-#[graphql_interface(Context = Context, for = [TextBlock, SeriesBlock])]
-pub(crate) trait Block {
+#[graphql_interface(Context = Context<'ctx>, for = [TextBlock<'static>, SeriesBlock<'static>])]
+pub(crate) trait Block<'ctx> {
     // To avoid code duplication, all the shared data is stored in `SharedData`
     // and only a `shared` method is mandatory. All other method (in particular,
     // all that are visible to GraphQL) are defined in the trait already.
@@ -68,38 +68,40 @@ pub(crate) struct SharedData {
 
 /// A block just showing some text.
 #[derive(GraphQLObject)]
-#[graphql(Context = Context, impl = BlockValue)]
-pub(crate) struct TextBlock {
+#[graphql(Context = Context<'ctx>, impl = BlockValue)]
+pub(crate) struct TextBlock<'ctx> {
     #[graphql(skip)]
     pub(crate) shared: SharedData,
     pub(crate) content: String,
+    dummy: &'ctx (),
 }
 
 #[graphql_interface]
-impl Block for TextBlock {
+impl<'ctx> Block<'ctx> for TextBlock<'ctx> {
     fn shared(&self) -> &SharedData {
         &self.shared
     }
 }
 
-pub(crate) struct SeriesBlock {
+pub(crate) struct SeriesBlock<'ctx> {
     pub(crate) shared: SharedData,
     pub(crate) series: Id,
     pub(crate) layout: VideoListLayout,
     pub(crate) order: VideoListOrder,
+    dummy: &'ctx (),
 }
 
 #[graphql_interface]
-impl Block for SeriesBlock {
+impl<'ctx> Block<'ctx> for SeriesBlock<'ctx> {
     fn shared(&self) -> &SharedData {
         &self.shared
     }
 }
 
 /// A block just showing the list of videos in an Opencast series
-#[graphql_object(Context = Context, impl = BlockValue)]
-impl SeriesBlock {
-    async fn series(&self, context: &Context) -> FieldResult<Series> {
+#[graphql_object(Context = Context<'ctx>, impl = BlockValue)]
+impl<'ctx> SeriesBlock<'ctx> {
+    async fn series(&self, context: &Context<'ctx>) -> FieldResult<Series> {
         // `unwrap` is okay here because of our foreign key constraint
         Ok(Series::load_by_id(self.series, context).await?.unwrap())
     }
@@ -113,9 +115,9 @@ impl SeriesBlock {
     }
 }
 
-impl BlockValue {
+impl<'ctx> BlockValue<'ctx> {
     /// Fetches all blocks for the given realm from the database.
-    pub(crate) async fn load_for_realm(realm_key: Key, context: &Context) -> FieldResult<Vec<Self>> {
+    pub(crate) async fn load_for_realm(realm_key: Key, context: &Context<'ctx>) -> FieldResult<Vec<Self>> {
         context.db.get()
             .await?
             .query_raw(
@@ -134,7 +136,7 @@ impl BlockValue {
             .map_err(Into::into)
     }
 
-    fn from_row(row: Row) -> Result<BlockValue> {
+    fn from_row(row: Row) -> Result<Self> {
         let ty: BlockType = row.get(1);
         let shared = SharedData {
             id: Id::block(row.get_key(0)),
@@ -157,6 +159,7 @@ impl BlockValue {
                     ),
                     layout: get_type_dependent(&row, 6, "videolist", "videolist_layout")?,
                     order: get_type_dependent(&row, 7, "videolist", "videolist_order")?,
+                    dummy: &(),
                 }.into()
             }
         };

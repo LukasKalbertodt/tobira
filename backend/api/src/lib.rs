@@ -21,28 +21,30 @@ pub(crate) use id::{Id, Key};
 
 
 /// Creates and returns the API root node.
-pub fn root_node() -> RootNode {
-    RootNode::new(Query, Mutation::new(), Subscription::new())
+pub fn root_node() -> RootNode<'static> {
+    RootNode::new(Query(&()), Mutation::new(), Subscription::new())
 }
 
 /// Type of our API root node.
-pub type RootNode = juniper::RootNode<'static, Query, Mutation, Subscription>;
+pub type RootNode<'ctx> = juniper::RootNode<'static, Query<'ctx>, Mutation<'ctx>, Subscription<'ctx>>;
 
 
 /// The context that is accessible to every resolver in our API.
-pub struct Context {
+pub struct Context<'a> {
     db: Pool,
-    realm_tree: model::realm::Tree,
+    realm_tree: model::realm::Tree<'a>,
+    dummy: &'a (),
 }
 
-impl Context {
+impl<'a> Context<'a> {
     pub async fn new(db: Pool) -> Result<Self> {
         let realm_tree = model::realm::Tree::load(&db).await?;
         Ok(Self {
             db,
             realm_tree,
+            dummy: &(),
         })
     }
 }
 
-impl juniper::Context for Context {}
+impl<'a> juniper::Context for Context<'a> {}

@@ -4,22 +4,22 @@ use crate::{Context, Id, model::{realm::Realm, event::Event}};
 
 
 /// The root query object.
-pub struct Query;
+pub struct Query<'ctx>(pub &'ctx ());
 
-#[graphql_object(Context = Context)]
-impl Query {
+#[graphql_object(Context = Context<'ctx>)]
+impl<'ctx> Query<'ctx> {
     fn api_version() -> &str {
         "0.0"
     }
 
     /// Returns a flat list of all realms.
-    fn realms(context: &Context) -> Vec<&Realm> {
+    fn realms(context: &Context<'ctx>) -> Vec<&Realm> {
         context.realm_tree.realms.values().collect()
     }
 
     /// Returns the realm with the specific ID or `None` if the ID does not
     /// refer to a realm.
-    fn realm_by_id(id: Id, context: &Context) -> Option<&Realm> {
+    fn realm_by_id(id: Id, context: &Context<'ctx>) -> Option<&Realm> {
         context.realm_tree.get_node(&id)
     }
 
@@ -32,17 +32,17 @@ impl Query {
     /// to have a path segment of `""`, and with the above rule so is its full
     /// path. The path of every other realm will start with `"/"` delimiting the
     /// root realm path segement from the second segment in the path.
-    fn realm_by_path(path: String, context: &Context) -> Option<&Realm> {
+    fn realm_by_path(path: String, context: &Context<'ctx>) -> Option<&Realm> {
         context.realm_tree.from_path(&path)
     }
 
     /// Returns the root realm.
-    fn root_realm(context: &Context) -> &Realm {
+    fn root_realm(context: &Context<'ctx>) -> &Realm {
         context.realm_tree.root()
     }
 
     /// Returns an event by its ID.
-    async fn event(id: Id, context: &Context) -> FieldResult<Option<Event>> {
+    async fn event(id: Id, context: &Context<'ctx>) -> FieldResult<Option<Event>> {
         Event::load_by_id(id, context).await
     }
 }

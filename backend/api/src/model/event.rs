@@ -5,7 +5,7 @@ use juniper::{graphql_object, FieldResult};
 use crate::{Context, Id, id::Key, model::series::Series, util::RowExt};
 
 
-pub(crate) struct Event {
+pub(crate) struct Event<'ctx> {
     key: Key,
     title: String,
     video: String,
@@ -13,10 +13,11 @@ pub(crate) struct Event {
     description: Option<String>,
     duration: u32,
     series: Option<Key>,
+    dummy: &'ctx (),
 }
 
-#[graphql_object(Context = Context)]
-impl Event {
+#[graphql_object(Context = Context<'ctx>)]
+impl<'ctx> Event<'ctx> {
     fn id(&self) -> Id {
         Id::event(self.key)
     }
@@ -41,7 +42,7 @@ impl Event {
         self.description.as_deref()
     }
 
-    async fn series(&self, context: &Context) -> FieldResult<Option<Series>> {
+    async fn series(&self, context: &Context<'ctx>) -> FieldResult<Option<Series>> {
         if let Some(series) = self.series {
             Series::load_by_id(Id::series(series), context).await
         } else {
@@ -50,8 +51,8 @@ impl Event {
     }
 }
 
-impl Event {
-    pub(crate) async fn load_by_id(id: Id, context: &Context) -> FieldResult<Option<Self>> {
+impl<'ctx> Event<'ctx> {
+    pub(crate) async fn load_by_id(id: Id, context: &Context<'ctx>) -> FieldResult<Option<Self>> {
         let result = if let Some(key) = id.key_for(Id::EVENT_KIND) {
             context.db.get()
                 .await?
@@ -70,7 +71,7 @@ impl Event {
         Ok(result)
     }
 
-    pub(crate) async fn load_for_series(series_key: Key, context: &Context) -> FieldResult<Vec<Self>> {
+    pub(crate) async fn load_for_series(series_key: Key, context: &Context<'ctx>) -> FieldResult<Vec<Self>> {
         let result = context.db.get()
             .await?
             .query_raw(
@@ -96,6 +97,7 @@ impl Event {
             duration: row.get::<_, i32>(4) as u32,
             description: row.get(5),
             series: row.get::<_, Option<i64>>(6).map(|series| series as u64),
+            dummy: &(),
         }
     }
 }

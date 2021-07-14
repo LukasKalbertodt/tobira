@@ -14,16 +14,17 @@ use crate::{
 };
 
 
-pub(crate) struct Realm {
+pub(crate) struct Realm<'ctx> {
     key: Key,
     name: String,
     parent_key: Option<Key>,
     path_segment: String,
     child_keys: Vec<Key>,
+    dummy: &'ctx (),
 }
 
-#[graphql_object(Context = Context)]
-impl Realm {
+#[graphql_object(Context = Context<'ctx>)]
+impl<'ctx> Realm<'ctx> {
     fn id(&self) -> Id {
         Id::realm(self.key)
     }
@@ -32,15 +33,15 @@ impl Realm {
         &self.name
     }
 
-    fn path(&self, context: &Context) -> String {
+    fn path(&self, context: &Context<'ctx>) -> String {
         Tree::path(self, &context.realm_tree.realms)
     }
 
-    fn parent(&self, context: &Context) -> Option<&Realm> {
+    fn parent(&self, context: &Context<'ctx>) -> Option<&Realm> {
         self.parent_key.map(|parent_key| &context.realm_tree.realms[&parent_key])
     }
 
-    fn parents(&self, context: &Context) -> Vec<&Realm> {
+    fn parents(&self, context: &Context<'ctx>) -> Vec<&Realm> {
         let mut parents = Tree::walk_up(self, &context.realm_tree.realms)
             .skip(1)
             .collect::<Vec<_>>();
@@ -48,14 +49,14 @@ impl Realm {
         parents
     }
 
-    fn children(&self, context: &Context) -> Vec<&Realm> {
+    fn children(&self, context: &Context<'ctx>) -> Vec<&Realm> {
         self.child_keys.iter()
             .map(|child| &context.realm_tree.realms[&child])
             .collect()
     }
 
     /// Returns the (content) blocks of this realm.
-    async fn blocks(&self, context: &Context) -> FieldResult<Vec<BlockValue>> {
+    async fn blocks(&self, context: &Context<'ctx>) -> FieldResult<Vec<BlockValue>> {
         // TODO: this method can very easily lead to an N+1 query problem.
         // However, it is unlikely that we ever have that problem: the frontend
         // will only show one realm at a time, so the query will also only
@@ -64,12 +65,12 @@ impl Realm {
     }
 }
 
-pub(crate) struct Tree {
-    pub(crate) realms: HashMap<Key, Realm>,
+pub(crate) struct Tree<'ctx> {
+    pub(crate) realms: HashMap<Key, Realm<'ctx>>,
     from_path: HashMap<String, Key>,
 }
 
-impl Tree {
+impl<'ctx> Tree<'ctx> {
     pub(crate) async fn load(db: &Pool) -> Result<Self> {
         debug!("Loading realms from database");
 
@@ -125,14 +126,14 @@ impl Tree {
         Ok(Tree { realms, from_path })
     }
 
-    fn walk_up<'a>(realm: &'a Realm, realms: &'a HashMap<Key, Realm>) -> impl Iterator<Item = &'a Realm> {
+    fn walk_up<'a>(realm: &'a Realm<'ctx>, realms: &'a HashMap<Key, Realm<'ctx>>) -> impl Iterator<Item = &'a Realm<'ctx>> {
         std::iter::successors(
             Some(realm),
             move |child| child.parent_key.map(|parent_key| &realms[&parent_key])
         )
     }
 
-    fn path(realm: &Realm, realms: &HashMap<Key, Realm>) -> String {
+    fn path(realm: &Realm<'ctx>, realms: &HashMap<Key, Realm<'ctx>>) -> String {
         let mut segments = Tree::walk_up(realm, realms)
             .map(|realm| &*realm.path_segment)
             .collect::<Vec<_>>();
@@ -140,15 +141,15 @@ impl Tree {
         segments.join("/")
     }
 
-    pub(crate) fn get_node(&self, id: &Id) -> Option<&Realm> {
+    pub(crate) fn get_node(&self, id: &Id) -> Option<&Realm<'ctx>> {
         self.realms.get(&id.key_for(Id::REALM_KIND)?)
     }
 
-    pub(crate) fn root(&self) -> &Realm {
+    pub(crate) fn root(&self) -> &Realm<'ctx> {
         &self.realms[&0]
     }
 
-    pub(crate) fn from_path(&self, path: &str) -> Option<&Realm> {
+    pub(crate) fn from_path(&self, path: &str) -> Option<&Realm<'ctx>> {
         // We accept path with and without a trailing slash.
         let path = if path.ends_with('/') { &path[..path.len() - 1] } else { path };
         self.from_path.get(path).map(|key| &self.realms[key])
