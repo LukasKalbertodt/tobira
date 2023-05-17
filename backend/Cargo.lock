@@ -1822,6 +1822,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "postgres"
+version = "0.19.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bed5017bc2ff49649c0075d0d7a9d676933c1292480c1d137776fb205b5cd18"
+dependencies = [
+ "bytes",
+ "fallible-iterator",
+ "futures-util",
+ "log",
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "postgres-derive"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2587,6 +2601,7 @@ dependencies = [
  "paste",
  "pem-rfc7468",
  "percent-encoding",
+ "postgres",
  "postgres-types",
  "procfs",
  "prometheus-client",
@@ -2608,6 +2623,7 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
+ "toml",
 ]
 
 [[package]]

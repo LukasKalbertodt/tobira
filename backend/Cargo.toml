@@ -78,6 +78,10 @@ procfs = "0.15.1"
 [build-dependencies]
 built = { version = "0.6", features = ["chrono", "git2"] }
 
+[dev-dependencies]
+toml = "0.5"
+postgres = "0.19.5"
+hyperlocal = "0.8"
 
 # Codegen options
 
