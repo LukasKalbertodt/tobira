@@ -501,43 +501,50 @@ impl Series {
 
         info!(series_id = %id, "Starting content update of series");
 
-        // Map added events to series id and removed events to `None`.
-        let modified_events = added_events
-            .into_iter()
-            .map(|id| (id, Some(series.opencast_id.clone())))
-            .chain(removed_events.into_iter().map(|id| (id, None)));
+        let added_events = added_events.iter().map(|e| (*e, true));
+        let removed_events = removed_events.iter().map(|e| (*e, false));
+        let modified_events = added_events.chain(removed_events);
 
-        // Load modified events in parallel to get their Opencast id.
-        // Todo: maybe just pass opencast ids of events. Then this wouldn't need to do all this extra loading.
+        // Load modified events to get their Opencast id and check input.
         let changes = futures::stream::iter(modified_events)
-            .map(|(id, series_id)| async move {
-                let event = AuthorizedEvent::load_for_mutation(id, context).await?;
+            .then(|(id, add)| async move {
+                let event = AuthorizedEvent::load_for_mutation(id, context).await
+                    .map_err(|_| err::not_authorized!(
+                        key = "series.not-allowed",
+                        "missing write access to event {id}")
+                    )?;
 
-                Ok::<_, ApiError>((event, series_id))
+                if add && event.series.is_some() {
+                    return Err(err::invalid_input!("event {id} is already in another series"));
+                }
+                if !add && event.series.as_ref().map(|s| s.key) != Some(series.key) {
+                    return Err(err::invalid_input!("event {id} is not part of the series"));
+                }
+
+                Ok::<_, ApiError>((event, add))
             })
-            .buffer_unordered(8)
             .try_collect::<Vec<_>>()
             .await?;
 
-        let mut removed_events = Vec::new();
-        let mut added_events = Vec::new();
-
-        for (event, series_id) in changes {
-            let metadata = json!([{ "id": "isPartOf", "value": series_id }]);
+        for (event, add) in &changes {
+            let metadata = json!([{
+                "id": "isPartOf",
+                "value": add.then_some(&series.opencast_id),
+            }]);
 
             let response = context
                 .oc_client
-                .update_metadata(&event, &metadata)
+                .update_metadata(event, &metadata)
                 .await
                 .map_err(|e| {
                     error!("Failed to set series: {}", e);
                     err::opencast_unavailable!("Failed to set series")
                 })?;
 
-            let event_id = OpencastItem::id(&event);
+            let event_id = OpencastItem::id(event);
 
             if response.status() == StatusCode::NO_CONTENT {
-                //204: The metadata of the given namespace (i.e. "isPartOf") has been updated.
+                // 204: The metadata of the given namespace (i.e. "isPartOf") has been updated.
                 info!(event_id, "Event updated, attempting metadata republish");
 
                 if let Err(e) = AuthorizedEvent::start_workflow(
@@ -552,12 +559,6 @@ impl Series {
                     );
                     continue;
                 }
-
-                if series_id.is_none() {
-                    removed_events.push(event.key);
-                } else {
-                    added_events.push(event.key);
-                }
             } else {
                 warn!(
                     event_id,
@@ -568,27 +569,18 @@ impl Series {
         }
 
         // Update events in Tobira
-        if !removed_events.is_empty() || !added_events.is_empty() {
+        if !changes.is_empty() {
             let query = "\
                 update events \
                 set \
-                    series = case \
-                        when id = any($1) then $3 \
-                        when id = any($2) then null \
-                        else series \
-                    end, \
-                    part_of = case \
-                        when id = any($1) then $4 \
-                        when id = any($2) then null \
-                        else part_of \
-                    end, \
-                    updated = $5 \
-                where id = any($1) or id = any($2) \
+                    series = nullif(series, $2), \
+                    part_of = nullif(part_of, $3), \
+                    updated = $4 \
+                where id = any($1) \
             ";
 
             context.db.execute(query, &[
-                &added_events,
-                &removed_events,
+                &changes.iter().map(|(e, _)| e.key).collect::<Vec<_>>(),
                 &series.key,
                 &series.opencast_id,
                 &timestamp,
@@ -797,4 +789,3 @@ define_sort_column_and_order!(
     };
     pub struct SeriesSortOrder
 );
-

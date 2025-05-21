@@ -77,9 +77,9 @@ pub(crate) struct AuthorizedEvent {
 
 #[derive(Debug)]
 pub(crate) struct PreloadedSeries {
-    key: Key,
-    opencast_id: String,
-    title: String,
+    pub(crate) key: Key,
+    pub(crate) opencast_id: String,
+    pub(crate) title: String,
 }
 
 #[derive(Debug)]
