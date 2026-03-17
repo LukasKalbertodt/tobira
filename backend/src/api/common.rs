@@ -2,13 +2,13 @@ use crate::{
     api::{
         Id,
         Context,
-        model::{
-            event::AuthorizedEvent,
-            series::Series,
-            realm::Realm,
-            playlist::AuthorizedPlaylist,
-            search::{SearchEvent, SearchRealm, SearchSeries},
-        },
+        // model::{
+        //     event::AuthorizedEvent,
+        //     series::Series,
+        //     realm::Realm,
+        //     playlist::AuthorizedPlaylist,
+        //     search::{SearchEvent, SearchRealm, SearchSeries},
+        // },
     },
     search::Playlist as SearchPlaylist,
 };
@@ -17,16 +17,16 @@ use crate::{
 /// A node with a globally unique ID. Mostly useful for relay.
 #[juniper::graphql_interface(
     Context = Context,
-    for = [
-        AuthorizedEvent,
-        AuthorizedPlaylist,
-        Realm,
-        Series,
-        SearchEvent,
-        SearchRealm,
-        SearchSeries,
-        SearchPlaylist,
-    ]
+    // for = [
+    //     AuthorizedEvent,
+    //     AuthorizedPlaylist,
+    //     Realm,
+    //     Series,
+    //     SearchEvent,
+    //     SearchRealm,
+    //     SearchSeries,
+    //     SearchPlaylist,
+    // ]
 )]
 pub(crate) trait Node {
     fn id(&self) -> Id;

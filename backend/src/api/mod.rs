@@ -1,8 +1,8 @@
 //! Definition of the GraphQL API.
 
 use self::{
-    mutation::Mutation,
-    query::Query,
+    // mutation::Mutation,
+    // query::Query,
     subscription::Subscription,
 };
 
@@ -12,16 +12,16 @@ mod context;
 mod err;
 mod id;
 mod jwt;
-mod model;
-mod mutation;
-mod query;
+// mod model;
+// mod mutation;
+// mod query;
 mod subscription;
 mod util;
 
 pub(crate) use self::{
     id::Id,
     context::Context,
-    common::{Node, NodeValue},
+    // common::{Node, NodeValue},
 };
 
 
@@ -32,3 +32,21 @@ pub(crate) fn root_node() -> RootNode {
 
 /// Type of our API root node.
 pub(crate) type RootNode = juniper::RootNode<'static, Query, Mutation, Subscription>;
+
+pub(crate) struct Query;
+
+#[juniper::graphql_object(Context = Context)]
+impl Query {
+    fn foo() -> String {
+        "hi".into()
+    }
+}
+
+pub(crate) struct Mutation;
+
+#[juniper::graphql_object(Context = Context)]
+impl Mutation {
+    fn foo() -> String {
+        "hi".into()
+    }
+}
